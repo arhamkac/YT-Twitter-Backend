@@ -344,7 +344,9 @@ const updateUserCoverImage = asyncHandler(async(req, res) => {
     }
 
     //TODO: delete old image - assignment
-
+    const user_for_old_avatar_deletion=await User.findById(req.user._id)
+    const oldCoverImage=extractPublicId(user_for_old_avatar_deletion.coverImage)
+    // console.log(user_for_old_avatar_deletion.coverImage)
 
     const coverImage = await uploadOnCloudinary(coverImageLocalPath)
 
@@ -352,6 +354,9 @@ const updateUserCoverImage = asyncHandler(async(req, res) => {
         throw new ApiError(400, "Error while uploading on avatar")
         
     }
+    // console.log(coverImage)
+
+    const destroyOldCoverImage=await cloudinary.uploader.destroy(oldCoverImage)
 
     const user = await User.findByIdAndUpdate(
         req.user?._id,
