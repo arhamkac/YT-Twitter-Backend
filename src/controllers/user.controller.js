@@ -5,7 +5,14 @@ import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose";
+import {v2 as cloudinary} from "cloudinary"
 
+function extractPublicId(url) {
+  const parts = url.split('/');
+  const fileName = parts[parts.length - 1];
+  const publicId = fileName.split('.')[0]
+  return publicId;
+}
 
 const generateAccessAndRefereshTokens = async(userId) =>{
     try {
@@ -294,12 +301,22 @@ const updateUserAvatar = asyncHandler(async(req, res) => {
     }
 
     //TODO: delete old image - assignment
+    const user_for_old_avatar_deletion=await User.findById(req.user._id)
+    const oldAvatar=extractPublicId(user_for_old_avatar_deletion.avatar)
+    //console.log(user_for_old_avatar_deletion.avatar)
 
     const avatar = await uploadOnCloudinary(avatarLocalPath)
+    
 
     if (!avatar.url) {
         throw new ApiError(400, "Error while uploading on avatar")
         
+    }
+   // console.log(avatar.url)
+    
+    const destroyOldAvatar=await cloudinary.uploader.destroy(oldAvatar)
+    if(!destroyOldAvatar){
+        throw new ApiError(400,"Avat deletion failed")
     }
 
     const user = await User.findByIdAndUpdate(
