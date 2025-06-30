@@ -15,9 +15,67 @@ function extractPublicId(url) {
 }
 
 const getAllVideos = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
+    const { page = 1, limit = 10, query:search, sortBy, sortType, userId } = req.query
     //TODO: get all videos based on query, sort, pagination
     
+    const pipeline=[
+        {
+            $match:{
+                ...(search &&{
+                    title:{$regex:search, $options:"im"} //regex-used for pattern matching and options-i(case insensitive),m(full find)
+                }),
+                ...(isValidObjectId(userId) &&{
+                    owner:new mongoose.Types.ObjectId(userId)
+                })
+            }
+        },
+        {
+            $lookup:{
+                from:"users",
+                localField:"owner",
+                foreignField:"_id",
+                as:"owner",
+                pipeline:[
+                    {
+                        $project:{
+                            username:1,
+                            fullName:1,
+                            avatar:1
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            $addFields:{
+                owner:{$first:"$owner"}
+            }
+        }
+    ]
+
+    if(!pipeline){
+        throw new ApiError(500,"Some server error in fetching videos")
+    }
+
+    const videos=await Video.aggregatePaginate(Video.aggregate(pipeline),{
+        page:parseInt(page),
+        limit:parseInt(limit),
+        sort:{[sortBy]:parseInt(sortType)},
+        customLabels: {
+           docs: "videos"
+        }
+    }) 
+
+    if(!videos){
+        throw new ApiError(400,"Check the queries whether they are valid or not")
+    }
+
+    return res
+    .status(200)
+    .json(new ApiResponse(
+        200,videos,"Videos fetched successfully"
+    ))
+
 })
 
 const publishAVideo = asyncHandler(async (req, res) => {
